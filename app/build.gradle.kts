@@ -54,8 +54,8 @@ dependencies {
     // POI for Excel
     implementation("org.apache.poi:poi:5.2.5")
     implementation("org.apache.poi:poi-ooxml:5.2.5")
-    // Permissions (for writing to external storage)
+    // Permissions
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
-    // File picker / sharing
+    // File sharing
     implementation("androidx.documentfile:documentfile:1.0.1")
 }
