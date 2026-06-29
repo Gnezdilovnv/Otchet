@@ -1,17 +1,9 @@
 package com.example.otchet
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.os.Environment
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,7 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.room.Room
 import com.example.otchet.data.AppDatabase
@@ -32,7 +23,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
-import org.apache.poi.ss.usermodel.*
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 
 class MainActivity : ComponentActivity() {
@@ -66,6 +56,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App(recordDao: RecordDao) {
     val context = LocalContext.current
@@ -80,7 +71,6 @@ fun App(recordDao: RecordDao) {
     var time by remember { mutableStateOf(SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())) }
     var suppressed by remember { mutableStateOf(false) }
 
-    // Сохранение настроек направления и точки
     val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     LaunchedEffect(Unit) {
         direction = prefs.getString("direction", "") ?: ""
@@ -89,11 +79,12 @@ fun App(recordDao: RecordDao) {
 
     fun saveSettings() {
         prefs.edit().putString("direction", direction).putString("point", point).apply()
+        Toast.makeText(context, "Настройки сохранены", Toast.LENGTH_SHORT).show()
     }
 
     fun saveRecord() {
         if (direction.isBlank() || point.isBlank()) {
-            Toast.makeText(context, "Направление и точка должны быть заполнены", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Заполните направление и точку", Toast.LENGTH_SHORT).show()
             return
         }
         if (freqVideo.isBlank() || freqControl.isBlank()) {
@@ -148,26 +139,13 @@ fun App(recordDao: RecordDao) {
                 sheet.autoSizeColumn(i)
             }
             val filename = "отчёт_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.xlsx"
-            val folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if (!folder.exists()) folder.mkdirs()
-            val file = File(folder, filename)
+            val file = File(context.getExternalFilesDir(null), filename)
             FileOutputStream(file).use { workbook.write(it) }
             workbook.close()
 
-            // Отмечаем записи как экспортированные
             recordDao.markExported(unexported.map { it.id })
 
-            Toast.makeText(context, "Отчёт сохранён: $filename", Toast.LENGTH_LONG).show()
-
-            // Открываем Intent для отправки
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(Intent.createChooser(shareIntent, "Поделиться отчётом"))
-
+            Toast.makeText(context, "Отчёт сохранён: ${file.absolutePath}", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             Toast.makeText(context, "Ошибка: ${e.message}", Toast.LENGTH_LONG).show()
             e.printStackTrace()
@@ -178,7 +156,7 @@ fun App(recordDao: RecordDao) {
         topBar = { TopAppBar(title = { Text("Мониторинг") }) },
         floatingActionButton = {
             FloatingActionButton(onClick = { saveSettings() }) {
-                Text("Сохранить настройки")
+                Text("Настройки")
             }
         }
     ) { padding ->
@@ -189,7 +167,6 @@ fun App(recordDao: RecordDao) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Настройки
             OutlinedTextField(
                 value = direction,
                 onValueChange = { direction = it },
@@ -202,7 +179,6 @@ fun App(recordDao: RecordDao) {
                 label = { Text("Точка") },
                 modifier = Modifier.fillMaxWidth()
             )
-            // Тип – выпадающий список
             var expanded by remember { mutableStateOf(false) }
             ExposedDropdownMenuBox(
                 expanded = expanded,
